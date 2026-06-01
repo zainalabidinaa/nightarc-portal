@@ -6,10 +6,12 @@ export function getStreamUrl(stream: Pick<StreamItem, 'url' | 'externalUrl'>): s
   return stream.url || stream.externalUrl;
 }
 
-export function getVidstackSourceType(url: string): VidstackSourceType {
-  const path = url.split('?')[0]?.toLowerCase() ?? '';
-  if (path.endsWith('.m3u8') || path.includes('.m3u8/')) return 'application/x-mpegurl';
-  return 'video/mp4';
+export function getInitialSourceType(_url: string): VidstackSourceType {
+  return 'application/x-mpegurl';
+}
+
+export function getFallbackSourceType(currentType: VidstackSourceType): VidstackSourceType | null {
+  return currentType === 'application/x-mpegurl' ? 'video/mp4' : null;
 }
 
 export function streamMatchesUrl(stream: Pick<StreamItem, 'url' | 'externalUrl'>, url: string): boolean {
