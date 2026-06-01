@@ -219,7 +219,7 @@ export default function HomePage() {
         navigate({
           to: '/watch/$type/$id',
           params: { type: item.media_type, id: item.media_id },
-          search: { url: streamUrl, cid: cacheKey, title: watchTitle, pos: item.position_seconds > 0 ? item.position_seconds : undefined },
+          search: { url: streamUrl, cid: cacheKey, title: watchTitle, logo: undefined, pos: item.position_seconds > 0 ? item.position_seconds : undefined },
         });
         return;
       }

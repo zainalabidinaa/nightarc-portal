@@ -122,7 +122,7 @@ export default function DetailPage() {
     navigate({
       to: '/watch/$type/$id',
       params: { type, id: mediaId },
-      search: { url: streamUrl, cid: cacheKey, title: watchTitle, pos: savedPositionSeconds > 0 ? savedPositionSeconds : undefined },
+      search: { url: streamUrl, cid: cacheKey, title: watchTitle, logo: detail?.logo ?? undefined, pos: savedPositionSeconds > 0 ? savedPositionSeconds : undefined },
     });
   }
 
@@ -141,7 +141,7 @@ export default function DetailPage() {
       navigate({
         to: '/watch/$type/$id',
         params: { type, id: sid },
-        search: { url: streamUrl, cid: cacheKey, title: watchTitle, pos: savedPositionSeconds > 0 ? savedPositionSeconds : undefined },
+        search: { url: streamUrl, cid: cacheKey, title: watchTitle, logo: detail?.logo ?? undefined, pos: savedPositionSeconds > 0 ? savedPositionSeconds : undefined },
       });
     } else {
       setAutoPlaying(false);

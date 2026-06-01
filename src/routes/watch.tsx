@@ -8,8 +8,8 @@ import { getCachedStreams, getCachedStream } from '@/lib/stream-cache';
 
 export default function WatchPage() {
   const { type, id } = useParams({ strict: false }) as { type: string; id: string };
-  const { url: streamUrl = '', cid: cacheId = '', title: displayTitle, pos: resumePosition } =
-    useSearch({ strict: false }) as { url?: string; cid?: string; title?: string; pos?: number };
+  const { url: streamUrl = '', cid: cacheId = '', title: displayTitle, logo: mediaLogo, pos: resumePosition } =
+    useSearch({ strict: false }) as { url?: string; cid?: string; title?: string; logo?: string; pos?: number };
   const router = useRouter();
   const { addons } = useAuth();
 
@@ -45,6 +45,7 @@ export default function WatchPage() {
       streams={allStreams}
       currentStream={activeStream}
       title={resolvedTitle}
+      mediaLogo={mediaLogo}
       mediaId={id}
       mediaType={type}
       startPosition={savedPosition.current > 0 ? savedPosition.current : resumePosition}

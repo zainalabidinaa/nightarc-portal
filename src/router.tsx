@@ -104,6 +104,7 @@ const watchRoute = createRoute({
     url: String(search.url ?? ''),
     cid: String(search.cid ?? ''),
     title: String(search.title ?? ''),
+    logo: search.logo ? String(search.logo) : undefined as string | undefined,
     pos: search.pos !== undefined ? Number(search.pos) : undefined as number | undefined,
   }),
   component: lazily(() => import('@/routes/watch')),
@@ -133,6 +134,12 @@ const collectionsRoute = createRoute({
   component: lazily(() => import('@/routes/collections')),
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: '/admin',
+  component: lazily(() => import('@/routes/admin')),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   authRoute,
@@ -145,6 +152,7 @@ const routeTree = rootRoute.addChildren([
     searchRoute,
     settingsRoute,
     collectionsRoute,
+    adminRoute,
   ]),
 ]);
 

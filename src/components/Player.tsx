@@ -24,6 +24,7 @@ interface PlayerProps {
   streams: StreamItem[];
   currentStream: StreamItem;
   title: string;
+  mediaLogo?: string;
   mediaId: string;
   mediaType: string;
   startPosition?: number;
@@ -127,10 +128,11 @@ function SeekIcon({ seconds, direction }: { seconds: number; direction: 'back' |
 // ── PlayerUI (must live inside <MediaPlayer> to use useMediaState) ─────────
 
 function PlayerUI({
-  title, currentStream, streams, subtitles,
+  title, mediaLogo, currentStream, streams, subtitles,
   mediaId, mediaType, onBack, onSwitchStream, playerRef,
 }: {
   title: string;
+  mediaLogo?: string;
   currentStream: StreamItem;
   streams: StreamItem[];
   subtitles: SubtitleItem[];
@@ -172,26 +174,28 @@ function PlayerUI({
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const currentMeta = parseStreamMeta(currentStream);
 
-  // Source name for buffering overlay — strip generic fallbacks
-  const sourceName = currentStream.addonName && currentStream.addonName !== 'Direct'
-    ? currentStream.addonName
-    : null;
-
   return (
     <>
       {/* Subtitle overlay */}
       <Captions className="absolute bottom-24 left-0 right-0 z-10 text-center pointer-events-none" />
 
-      {/* Buffering state — show addon name pulsing when loading and controls hidden */}
-      {(waiting || !canPlay) && !showControls && sourceName && (
+      {/* Buffering — show title logo pulsing when controls are hidden, spinner otherwise */}
+      {(waiting || !canPlay) && !showControls && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <span className="text-white/70 text-2xl font-bold tracking-wide animate-pulse select-none">
-            {sourceName}
-          </span>
+          {mediaLogo ? (
+            <img
+              src={mediaLogo}
+              alt={title}
+              className="max-h-24 max-w-xs object-contain animate-pulse select-none"
+              draggable={false}
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          )}
         </div>
       )}
-      {/* Fallback spinner when controls ARE visible or no source name */}
-      {(waiting || !canPlay) && (showControls || !sourceName) && (
+      {/* Spinner when controls are visible (user is interacting) */}
+      {(waiting || !canPlay) && showControls && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
           <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
         </div>
@@ -391,7 +395,7 @@ function PlayerUI({
 // ── Main Player shell ──────────────────────────────────────────────────────
 
 export default function Player({
-  streamUrl, streams, currentStream, title,
+  streamUrl, streams, currentStream, title, mediaLogo,
   mediaId, mediaType, startPosition, subtitles = [],
   onSwitchStream, onBack,
 }: PlayerProps) {
@@ -475,6 +479,7 @@ export default function Player({
 
         <PlayerUI
           title={title}
+          mediaLogo={mediaLogo}
           currentStream={currentStream}
           streams={streams}
           subtitles={subtitles}
