@@ -70,6 +70,7 @@ export default function Player({
   const externalTrackRef = useRef<HTMLTrackElement | null>(null);
   const savedFailoverPosition = useRef(0);
   const startPosRef = useRef<number | undefined>(undefined);
+  const failoverToNextStreamRef = useRef<() => void>(() => {});
   const { currentProfile } = useAuth();
 
   const [state, setState] = useState<'loading' | 'playing' | 'paused' | 'ended' | 'error'>('loading');
@@ -123,19 +124,6 @@ export default function Player({
       video.src = streamUrl;
       video.load();
       video.play().catch(() => {});
-    };
-
-    const failoverToNextStream = () => {
-      const p = videoRef.current;
-      if (p?.currentTime) savedFailoverPosition.current = p.currentTime;
-      const nextFailed = new Set(failedUrls);
-      nextFailed.add(streamUrl);
-      setFailedUrls(nextFailed);
-      const next = sortStreamsForBrowserPlayback(streams).find(s => {
-        const url = getPlayableStreamUrl(s);
-        return url && url !== streamUrl && !nextFailed.has(url);
-      });
-      if (next) onSwitchStream(next);
     };
 
     if (!Hls.isSupported()) {
@@ -205,7 +193,7 @@ export default function Player({
     hls.loadSource(streamUrl);
     hls.attachMedia(video);
     hlsRef.current = hls;
-  }, [streamUrl, currentStream, streams, failedUrls, onSwitchStream]);
+  }, [streamUrl, currentStream]);
 
   useEffect(() => {
     initPlayer();
@@ -229,7 +217,7 @@ export default function Player({
     const onEnded = () => setState('ended');
     const onError = () => {
       if (hlsRef.current) return;
-      failoverToNextStream();
+      failoverToNextStreamRef.current();
     };
     const onTimeUpdate = () => {
       if (isDragging) return;
@@ -374,8 +362,15 @@ export default function Player({
       const url = getPlayableStreamUrl(s);
       return url && url !== streamUrl && !nextFailed.has(url);
     });
-    if (next) onSwitchStream(next);
+    if (next) {
+      onSwitchStream(next);
+    } else {
+      setState('error');
+      setErrMsg('No playable sources found');
+    }
   }, [failedUrls, onSwitchStream, streamUrl, streams]);
+
+  failoverToNextStreamRef.current = failoverToNextStream;
 
   // ── Seek drag ────────────────────────────────────────────────────────────
   const seekFromEvent = (e: React.MouseEvent | MouseEvent) => {
@@ -426,6 +421,10 @@ export default function Player({
       {/* Loading */}
       {state === 'loading' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-black/80 z-20">
+          <button onClick={onBack} className="absolute top-5 left-6 flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm font-medium">
+            <ChevronLeft size={20} strokeWidth={2} />
+            Back
+          </button>
           <div className="flex flex-col items-center gap-5">
             {mediaLogo && <img src={mediaLogo} alt="" className="h-10 object-contain" />}
             <h2 className="text-lg font-semibold text-white text-center max-w-sm px-4">{title}</h2>
