@@ -123,12 +123,20 @@ export default function Player({
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
       video.src = streamUrl;
       video.load();
-      video.play().catch(() => {});
+      video.play().catch(() => setState('paused'));
     };
+
+    // Probe-confirmed MP4 → go native directly, skip HLS.js entirely
+    if (currentStream.behaviorHints?.webPlayableType === 'video/mp4') {
+      video.src = streamUrl;
+      video.load();
+      video.play().catch(() => setState('paused'));
+      return;
+    }
 
     if (!Hls.isSupported()) {
       video.src = streamUrl;
-      video.play().catch(() => {});
+      video.play().catch(() => setState('paused'));
       return;
     }
 
@@ -156,7 +164,7 @@ export default function Player({
       setAudioTracks(at); setSubTracks(st); setQualityLevels(ql);
       if (at.length > 0) setActiveAudio(hls.audioTrack >= 0 ? hls.audioTrack : 0);
       console.log('[hls] manifest parsed audio:', at.length, 'subs:', st.length, 'levels:', ql.length);
-      video.play().catch(() => {});
+      video.play().catch(() => setState('paused'));
     });
 
     hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
@@ -208,7 +216,7 @@ export default function Player({
     const video = videoRef.current;
     if (!video) return;
     const onCanPlay = () => {
-      setState('paused');
+      // onPlay is the single exit from 'loading' — don't set 'paused' here
       const resumeAt = savedFailoverPosition.current > 0 ? savedFailoverPosition.current : (startPosRef.current ?? 0);
       if (resumeAt > 0) { video.currentTime = resumeAt; savedFailoverPosition.current = 0; startPosRef.current = undefined; }
     };
