@@ -241,7 +241,7 @@ function SourcesPanel({
 
 function PlayerUI({
   title, mediaLogo, currentStream, streams, subtitles,
-  mediaId, mediaType, onBack, onSwitchStream, onPlaybackStalled, openSources, playerRef,
+  mediaId, mediaType, onBack, onSwitchStream, onPlaybackStalled, openSources, showControlsRef, playerRef,
 }: {
   title: string;
   mediaLogo?: string;
@@ -254,6 +254,7 @@ function PlayerUI({
   onSwitchStream: (s: StreamItem) => void;
   onPlaybackStalled: () => void;
   openSources?: boolean;
+  showControlsRef?: React.MutableRefObject<(() => void) | null>;
   playerRef: React.RefObject<MediaPlayerInstance | null>;
 }) {
   const paused = useMediaState('paused');
@@ -288,6 +289,8 @@ function PlayerUI({
   useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
 
   useEffect(() => { if (openSources) setShowSources(true); }, [openSources]);
+
+  useEffect(() => { if (showControlsRef) showControlsRef.current = resetHide; }, [showControlsRef, resetHide]);
 
   // Auto-unmute: player starts muted for reliable autoplay, unmute as soon as playback begins
   useEffect(() => {
@@ -622,8 +625,10 @@ export default function Player({
     }
   }, [startPosition]);
 
+  const showControlsRef = useRef<(() => void) | null>(null);
+
   return (
-    <div className="fixed inset-0 bg-black z-50">
+    <div className="fixed inset-0 bg-black z-50" onMouseMove={() => showControlsRef.current?.()}>
       {/* Error overlay */}
       {playbackError && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/90">
@@ -679,6 +684,7 @@ export default function Player({
           onSwitchStream={onSwitchStream}
           onPlaybackStalled={onError}
           openSources={forceOpenSources}
+          showControlsRef={showControlsRef}
           playerRef={playerRef}
         />
       </MediaPlayer>
