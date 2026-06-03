@@ -4,7 +4,7 @@ export async function fetchManifest(url: string): Promise<AddonManifest> {
   const res = await fetch(`/api/stremio/manifest?url=${encodeURIComponent(url)}`);
   const json = await res.json();
 
-  const baseURL = json.transportUrl || url.replace(/\/manifest\.json$/, '');
+  const baseURL = json.transportUrl || url.replace(/\/manifest\.json(\?.*)?$/, '');
 
   return {
     id: json.id || new URL(url).hostname,
