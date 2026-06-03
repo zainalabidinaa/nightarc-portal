@@ -1,18 +1,16 @@
 /**
- * Client-side stream probe.
+ * Client-side stream probe — mirrors Stremio's getContentType() approach.
  *
- * Unlike the server-side probe in api/stremio/stream.ts, this runs in the
- * browser with the user's own IP and session — so IP-locked debrid links
- * (Real-Debrid, Torbox, etc.) can be reached. It also follows redirects,
- * giving us the final CDN URL rather than the intermediate debrid URL.
+ * Uses a HEAD request (no body downloaded) to detect content-type from headers.
+ * HEAD requests avoid CORS preflight issues that plague GET requests with custom
+ * headers, and they work fine with IP-locked debrid redirects since they run in
+ * the browser with the user's own session.
  *
- * The probe is best-effort: if it fails or times out, callers should fall
- * back to heuristic type detection and let the player handle errors.
+ * If HEAD fails (405, timeout, CORS) → returns null → caller falls back to
+ * URL-pattern heuristics and lets the player handle errors.
  */
 
 export interface StreamProbeResult {
-  /** The final URL after following all redirects. */
-  finalUrl: string;
   /** Detected container/playlist type. */
   type: 'application/x-mpegurl' | 'video/mp4';
 }
@@ -21,60 +19,42 @@ export async function probeStreamClient(
   url: string,
   options?: { headers?: Record<string, string>; timeoutMs?: number }
 ): Promise<StreamProbeResult | null> {
-  const { headers: customHeaders, timeoutMs = 3000 } = options ?? {};
+  const { headers: customHeaders, timeoutMs = 5000 } = options ?? {};
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // HEAD request: just headers, no body — fast, no CORS preflight on simple requests
     const res = await fetch(url, {
-      method: 'GET',
+      method: 'HEAD',
       redirect: 'follow',
       signal: controller.signal,
-      headers: {
-        // Request only the first kilobyte — enough to read an HLS header or MP4 ftyp box
-        Range: 'bytes=0-1023',
-        Accept: 'application/vnd.apple.mpegurl, application/x-mpegurl, video/mp4, */*',
-        ...customHeaders,
-      },
+      headers: customHeaders ?? {},
     });
 
-    if (!res.ok && res.status !== 206) return null;
+    if (!res.ok) return null;
 
-    const finalUrl = res.url || url;
     const ct = (res.headers.get('content-type') || '').toLowerCase();
 
-    // Content-Type is the most reliable signal when present
     if (ct.includes('mpegurl') || ct.includes('x-mpegurl')) {
-      return { finalUrl, type: 'application/x-mpegurl' };
-    }
-    if (ct.includes('video/mp4') || ct.includes('video/webm')) {
-      return { finalUrl, type: 'video/mp4' };
+      return { type: 'application/x-mpegurl' };
     }
 
-    // Fall back to reading the first bytes of the body
-    const chunk = await res.text().catch(() => '');
-    if (chunk.trimStart().startsWith('#EXTM3U')) {
-      return { finalUrl, type: 'application/x-mpegurl' };
+    // video/mp4, video/webm, video/x-*, application/octet-stream, etc.
+    // If Content-Type is present and it's not HLS, treat as direct video
+    if (ct.startsWith('video/') || ct.includes('mp4') || ct.includes('octet-stream')) {
+      return { type: 'video/mp4' };
     }
 
-    // MP4 ftyp box typically appears in the first 16 bytes
-    const buf = new Uint8Array(chunk.length);
-    for (let i = 0; i < Math.min(chunk.length, 20); i++) buf[i] = chunk.charCodeAt(i);
-    for (let i = 0; i <= Math.min(buf.length - 4, 16); i++) {
-      if (buf[i] === 0x66 && buf[i+1] === 0x74 && buf[i+2] === 0x79 && buf[i+3] === 0x70) {
-        return { finalUrl, type: 'video/mp4' };
-      }
-    }
+    // Content-Type absent or generic — fall back to URL extension
+    const lower = url.toLowerCase();
+    if (lower.includes('.m3u8') || lower.includes('.m3u')) return { type: 'application/x-mpegurl' };
+    if (lower.includes('.mp4')) return { type: 'video/mp4' };
 
-    // URL extension as last resort
-    const lower = finalUrl.toLowerCase();
-    if (lower.includes('.m3u8') || lower.includes('.m3u')) return { finalUrl, type: 'application/x-mpegurl' };
-    if (lower.includes('.mp4')) return { finalUrl, type: 'video/mp4' };
-
-    // Reachable but unidentified — assume MP4 (native <video> will try it)
-    return { finalUrl, type: 'video/mp4' };
+    // Reachable but unidentified — assume MP4
+    return { type: 'video/mp4' };
   } catch {
-    // CORS block, network error, abort — not a problem, caller falls back
+    // 405 Method Not Allowed, network error, abort — caller falls back to heuristics
     return null;
   } finally {
     clearTimeout(timer);
