@@ -176,9 +176,11 @@ export default function WatchPage() {
   }
 
   // Use WebCodecs player for streams that need remux/transcode (MKV, HEVC, etc.)
-  // The Render server is disabled — we handle these client-side via WebAssembly.
+  // Only use it when no remux server is configured — if a server is available it
+  // already handled the remux and activeUrl points at an HLS stream.
   const tier = getStreamCompatibility(activeStream);
-  if (tier !== 'direct') {
+  const serverUrl = getStreamingServerUrl();
+  if (tier !== 'direct' && !serverUrl) {
     return (
       <WebCodecsPlayer
         streamUrl={activeUrl}
