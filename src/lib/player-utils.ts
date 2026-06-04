@@ -18,8 +18,6 @@ export function browserPlaybackScore(stream: StreamItem): number {
   const text = streamSearchText(stream);
   const streamUrl = getPlayableStreamUrl(stream) ?? '';
   let score = streamUrl ? 100 : -1000;
-  // Penalise MKV URLs even when the stream metadata doesn't mention MKV
-  if (streamUrl.toLowerCase().includes('.mkv')) score -= 80;
   if (stream.infoHash || stream.behaviorHints?.notWebReady) score -= 1000;
   if (text.includes('.mp4') || text.includes(' h.264') || text.includes(' h264') || text.includes('x264') || text.includes(' avc')) score += 80;
   if (text.includes('aac')) score += 30;
@@ -71,8 +69,22 @@ export function getStreamCompatibility(stream: StreamItem): StreamTier {
 
   if (badVideo || badAudio) return 'transcode';
 
-  // Container-level issue only → remux (copy streams, just repackage)
-  if (text.includes('.mkv')) return 'remux';
+  // MKV container: only needs remux if we can't confirm browser-compatible codecs.
+  // Chrome/Firefox can play MKV natively when the inner codec is H.264/VP9/AV1 + AAC/MP3.
+  // If the stream text explicitly mentions h264/avc/x264 (or no codec hint at all → assume
+  // H.264 since that's the vast majority of debrid files), treat as direct.
+  if (text.includes('.mkv')) {
+    const goodVideo =
+      text.includes('h.264') || text.includes('h264') || text.includes('x264') ||
+      text.includes('avc') || text.includes('vp9') || text.includes('av1');
+    const goodAudio =
+      text.includes('aac') || text.includes('mp3') || text.includes('ac3') ||
+      text.includes('eac3') || text.includes('dd+') || text.includes('ddp');
+    // If explicit good codecs found → direct. If no codec hints → assume H.264, direct.
+    // Only remux when MKV + unknown/mixed codec signals (no good, no bad).
+    if (goodVideo || (!badVideo && !badAudio)) return 'direct';
+    return 'remux';
+  }
 
   return 'direct';
 }
@@ -109,11 +121,6 @@ export function getInitialSourceType(url: string, stream?: Pick<StreamItem, 'beh
   for (const d of HLS_DOMAIN_PATTERNS) {
     if (lower.includes(d)) return 'application/x-mpegurl';
   }
-
-  // MKV is not natively playable as video/mp4 in most browsers.
-  // Try HLS first — if the proxy (MFP) transcoded it to HLS it'll work;
-  // if not, getFallbackSourceType will flip back to video/mp4.
-  if (urlPath.endsWith('.mkv')) return 'application/x-mpegurl';
 
   return 'video/mp4';
 }
