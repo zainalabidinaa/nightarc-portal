@@ -95,12 +95,13 @@ export function getInitialSourceType(url: string, stream?: Pick<StreamItem, 'beh
   }
 
   // proxyHeaders means auth headers are needed, not that the stream is HLS.
-  // Only treat as HLS if the URL doesn't already look like a direct video file.
-  // Check both the path and query params (e.g. torrent_name=File.mp4&name=...)
+  // Only treat as HLS if the URL path doesn't look like a direct video file.
+  // Intentionally check the path only — query params like torrent_name=File.mp4
+  // are metadata from debrid addons (Comet) and don't indicate the stream format.
+  // Comet's /playback/ endpoint always serves HLS regardless of the source filename.
   const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.m4v', '.mov'];
-  const looksLikeVideo = VIDEO_EXTS.some(ext =>
-    lower.endsWith(ext) || lower.includes(ext + '?') || lower.includes(ext + '&') || lower.includes(ext + '=') || lower.includes('/' + ext.slice(1) + '/')
-  );
+  const urlPath = lower.split('?')[0];
+  const looksLikeVideo = VIDEO_EXTS.some(ext => urlPath.endsWith(ext));
   if (stream?.behaviorHints?.proxyHeaders && !looksLikeVideo) return 'application/x-mpegurl';
 
   for (const d of HLS_DOMAIN_PATTERNS) {

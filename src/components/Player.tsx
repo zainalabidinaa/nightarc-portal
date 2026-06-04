@@ -500,8 +500,15 @@ function PlayerUI({
                   return (
                     <button key={trackId} onClick={() => {
                       setSelectedAudioTrackId(trackId);
-                      const t = (playerRef.current as any)?.audioTracks?.[i];
-                      if (t) t.selected = true;
+                      // Suppress error handler briefly — HLS.js fires a transient
+                      // error when switching audio tracks while buffering
+                      suppressErrorRef.current = true;
+                      setTimeout(() => { suppressErrorRef.current = false; }, 2000);
+                      try {
+                        const list = [...(playerRef.current?.audioTracks ?? [])];
+                        const t = list[i];
+                        if (t) t.selected = true;
+                      } catch { /* ignore */ }
                     }} className={`flex w-full items-center gap-4 py-3 text-left text-lg ${isSelected ? 'text-white' : 'text-white/55 hover:text-white'}`}>
                       <span className="w-5 text-white">{isSelected ? '✓' : ''}</span>
                       <span>{label}</span>
@@ -586,6 +593,7 @@ export default function Player({
   }, [currentStream]);
 
   const onError = useCallback(() => {
+    if (suppressErrorRef.current) return; // transient error during audio track switch
     console.log('[player] error | srcType:', srcType, '| url:', streamUrl);
     // 1. Try flipping HLS ↔ MP4 (cheap, same URL)
     const fallback = getFallbackSourceType(srcType);

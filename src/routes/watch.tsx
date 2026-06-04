@@ -41,9 +41,10 @@ export default function WatchPage() {
     if (serverUrl) fetch(`${serverUrl}/settings`, { signal: AbortSignal.timeout(10000) }).catch(() => {});
   }, []);
 
-  // Auto-fetch streams when navigated without a URL (Play button flow)
+  // Fetch streams for this title — always runs so Sources stays complete even
+  // when the page was opened with a pre-selected URL (initialUrl) or cached streams.
   useEffect(() => {
-    if (initialUrl || authLoading) return;
+    if (authLoading) return;
     if (addons.length === 0) return;
     // If the browse page prefetched and cached streams, use them immediately.
     if (hasCachedStreams) {
@@ -51,7 +52,7 @@ export default function WatchPage() {
     }
 
     let cancelled = false;
-    if (!hasCachedStreams) setFetchError(null);
+    if (!hasCachedStreams && !initialUrl) setFetchError(null);
 
     (async () => {
       try {
@@ -63,39 +64,43 @@ export default function WatchPage() {
         cacheStreams(cacheKey, fetched);
         setAllStreams(fetched);
 
-        const best = sortStreamsForBrowserPlayback(fetched)[0];
-        if (best) {
-          const rawUrl = getPlayableStreamUrl(best) ?? '';
-          const serverUrl = getStreamingServerUrl();
-          const tier = getStreamCompatibility(best);
-          console.log(`[watch] stream tier: ${tier} | server: ${serverUrl ? 'configured' : 'none'}`);
+        // Only auto-select the best stream if no URL was pre-selected (Play button flow).
+        // When initialUrl is set the player is already running — don't interrupt it.
+        if (!initialUrl) {
+          const best = sortStreamsForBrowserPlayback(fetched)[0];
+          if (best) {
+            const rawUrl = getPlayableStreamUrl(best) ?? '';
+            const serverUrl = getStreamingServerUrl();
+            const tier = getStreamCompatibility(best);
+            console.log(`[watch] stream tier: ${tier} | server: ${serverUrl ? 'configured' : 'none'}`);
 
-          // Only route through server for streams that actually need it.
-          // direct-tier HTTPS streams: try the browser first — elfhosted and
-          // similar proxies often redirect to CDN URLs the browser can load.
-          // HTTP streams still need the server to avoid mixed-content blocking.
-          const needsServer = serverUrl && (
-            tier !== 'direct' ||
-            (rawUrl.startsWith('http:') && window.location.protocol === 'https:')
-          );
+            // Only route through server for streams that actually need it.
+            // direct-tier HTTPS streams: try the browser first — elfhosted and
+            // similar proxies often redirect to CDN URLs the browser can load.
+            // HTTP streams still need the server to avoid mixed-content blocking.
+            const needsServer = serverUrl && (
+              tier !== 'direct' ||
+              (rawUrl.startsWith('http:') && window.location.protocol === 'https:')
+            );
 
-          if (needsServer) {
-            const effectiveTier = tier === 'direct' ? 'remux' : tier;
-            const remuxed = buildRemuxUrl(serverUrl, rawUrl, effectiveTier);
-            console.log(`[watch] routing via server (${effectiveTier}): ${remuxed}`);
-            setActiveStream({
-              ...best,
-              behaviorHints: { ...best.behaviorHints, webPlayableType: 'application/x-mpegurl' },
-            });
-            setActiveUrl(remuxed);
+            if (needsServer) {
+              const effectiveTier = tier === 'direct' ? 'remux' : tier;
+              const remuxed = buildRemuxUrl(serverUrl, rawUrl, effectiveTier);
+              console.log(`[watch] routing via server (${effectiveTier}): ${remuxed}`);
+              setActiveStream({
+                ...best,
+                behaviorHints: { ...best.behaviorHints, webPlayableType: 'application/x-mpegurl' },
+              });
+              setActiveUrl(remuxed);
+            } else {
+              console.log(`[watch] direct play (${tier}): ${rawUrl}`);
+              setActiveStream(best);
+              setActiveUrl(rawUrl);
+            }
+            setFetchError('');
           } else {
-            console.log(`[watch] direct play (${tier}): ${rawUrl}`);
-            setActiveStream(best);
-            setActiveUrl(rawUrl);
+            setFetchError('No playable sources found for this title.');
           }
-          setFetchError('');
-        } else {
-          setFetchError('No playable sources found for this title.');
         }
       } catch {
         if (!cancelled) setFetchError('Failed to load sources. Check your addons in Settings.');
@@ -103,7 +108,7 @@ export default function WatchPage() {
     })();
 
     return () => { cancelled = true; };
-  }, [type, id, addons, initialUrl, authLoading]);
+  }, [type, id, addons, authLoading]);
 
   useEffect(() => {
     if (!addons || addons.length === 0) return;
