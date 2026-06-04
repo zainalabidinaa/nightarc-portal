@@ -79,7 +79,11 @@ export function buildRemuxUrl(
 ): string {
   const effective = tier === 'remux' ? BROAD_CODECS : codecs;
   const params = new URLSearchParams();
-  params.set('mediaURL', mediaUrl);
+  // Decode the URL before passing to remux server to avoid double-encoding issues
+  // (e.g. ElfHosted URLs with %255B from triple-encoded bracket characters)
+  let cleanUrl = mediaUrl;
+  try { cleanUrl = decodeURIComponent(mediaUrl); } catch { /* leave as-is if malformed */ }
+  params.set('mediaURL', cleanUrl);
   for (const c of effective.videoCodecs) params.append('videoCodecs', c);
   for (const c of effective.audioCodecs) params.append('audioCodecs', c);
   params.set('maxAudioChannels', String(effective.maxAudioChannels));
