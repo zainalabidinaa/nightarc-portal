@@ -30,8 +30,29 @@ export default function CatalogPage() {
   const colDrag = useRef<number | null>(null);
   const folderDrag = useRef<number | null>(null);
 
-  useEffect(() => { loadCollections(); }, []);
-  useEffect(() => { if (selectedId) loadFolders(selectedId); }, [selectedId]);
+  useEffect(() => {
+    loadCollections();
+
+    // Real-time: re-fetch when collections or folders change in Supabase
+    const colSub = supabase
+      .channel('collections-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collections' }, () => loadCollections())
+      .subscribe();
+
+    return () => { supabase.removeChannel(colSub); };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    loadFolders(selectedId);
+
+    const folderSub = supabase
+      .channel(`folders-changes-${selectedId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'folders', filter: `collection_id=eq.${selectedId}` }, () => loadFolders(selectedId))
+      .subscribe();
+
+    return () => { supabase.removeChannel(folderSub); };
+  }, [selectedId]);
   useEffect(() => {
     if (!selectedFolder) { setSources([]); setCatalogs([]); return; }
     const fid = selectedFolder.id;
@@ -247,6 +268,7 @@ export default function CatalogPage() {
           </p>
         </div>
         <div className="flex gap-2.5">
+          <Button variant="ghost" size="sm" onClick={() => { setLoading(true); loadCollections(); }}>↺ Refresh</Button>
           <Button variant="ghost" size="sm" onClick={() => setTab('json')}>⤵ Import pack JSON</Button>
           <Button size="sm" onClick={addCollection}>+ New collection</Button>
         </div>
