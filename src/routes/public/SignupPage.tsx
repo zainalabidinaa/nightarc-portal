@@ -73,7 +73,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <Card className="w-full max-w-sm p-8">
         <h1 className="text-2xl font-bold text-text mb-1">Create your account</h1>
-        <p className="text-sm text-muted mb-6">Join Luna today</p>
+        <p className="text-sm text-muted mb-6">Join Nightarc today</p>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-border rounded-lg p-1 mb-6">

@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <Card className="w-full max-w-sm p-8">
         <h1 className="text-2xl font-bold text-text mb-1">Welcome back</h1>
-        <p className="text-sm text-muted mb-6">Sign in to your Luna account</p>
+        <p className="text-sm text-muted mb-6">Sign in to your Nightarc account</p>
 
         {magicSent ? (
           <p className="text-sm text-green-600 bg-green-50 rounded-lg p-3">

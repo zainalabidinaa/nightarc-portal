@@ -89,7 +89,7 @@ export function Navbar() {
           ) : (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Sign in</Button>
-              <Button size="sm" onClick={() => navigate('/pricing')}>Get Luna</Button>
+              <Button size="sm" onClick={() => navigate('/pricing')}>Get Nightarc</Button>
             </>
           )}
         </div>

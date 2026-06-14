@@ -71,14 +71,14 @@ export default function LandingPage() {
             </p>
             <h1 className="font-display text-[clamp(48px,7vw,104px)] font-extrabold uppercase leading-[1.02]">
               Every screen.<br />
-              One <span className="text-accent" style={{ textShadow: '0 0 40px var(--accent-glow)' }}>Luna.</span>
+              One <span className="text-accent" style={{ textShadow: '0 0 40px var(--accent-glow)' }}>Nightarc.</span>
             </h1>
             <p className="mt-5 max-w-md text-[17px] text-muted">
               A members-only streaming platform built on the Stremio engine — curated collections,
               gorgeous artwork, and your whole household on every device.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Button size="lg" className="rounded-full" onClick={() => navigate('/pricing')}>Get Luna →</Button>
+              <Button size="lg" className="rounded-full" onClick={() => navigate('/pricing')}>Get Nightarc →</Button>
               <Button variant="ghost" size="lg" className="rounded-full" onClick={() => navigate('/login')}>Sign in</Button>
             </div>
             <div className="mt-7 flex flex-wrap gap-2.5">
@@ -99,7 +99,7 @@ export default function LandingPage() {
             <div className="absolute inset-x-4 bottom-4 flex items-center gap-3.5 rounded-2xl border border-border bg-bg2/70 p-4 backdrop-blur-md">
               <span className="h-16 w-12 flex-none rounded-lg shadow-glow" style={{ background: 'linear-gradient(160deg,#fa824d,#ff6a2b)' }} />
               <div>
-                <div className="font-display text-lg font-extrabold">Tonight on Luna</div>
+                <div className="font-display text-lg font-extrabold">Tonight on Nightarc</div>
                 <div className="font-mono text-xs text-muted">12 collections · 480 titles synced</div>
               </div>
             </div>
@@ -201,7 +201,7 @@ export default function LandingPage() {
           <a href="#" onClick={(e) => { e.preventDefault(); navigate('/pricing'); }}>Pricing</a>
           <a href="#">Support</a><a href="#">Status</a>
         </div>
-        <p className="mt-4 font-mono text-xs text-faint">© 2026 Luna · A private Stremio-powered platform</p>
+        <p className="mt-4 font-mono text-xs text-faint">© 2026 Nightarc · A private Stremio-powered platform</p>
       </footer>
     </div>
   );
