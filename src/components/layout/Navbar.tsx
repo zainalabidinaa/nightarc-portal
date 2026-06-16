@@ -73,6 +73,9 @@ export function Navbar() {
               <NavLink to="/admin/invites" className={navClass}>
                 {({ isActive }) => (<>Invites<ActiveBar show={isActive} /></>)}
               </NavLink>
+              <NavLink to="/admin/templates" className={navClass}>
+                {({ isActive }) => (<>Templates<ActiveBar show={isActive} /></>)}
+              </NavLink>
             </>
           )}
         </nav>

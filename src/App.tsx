@@ -11,6 +11,7 @@ import BillingPage from './routes/user/BillingPage';
 import CatalogPage from './routes/admin/CatalogPage';
 import UsersPage from './routes/admin/UsersPage';
 import InvitesPage from './routes/admin/InvitesPage';
+import TemplatesPage from './routes/admin/TemplatesPage';
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/admin/catalog" element={<AdminRoute><CatalogPage /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
           <Route path="/admin/invites" element={<AdminRoute><InvitesPage /></AdminRoute>} />
+          <Route path="/admin/templates" element={<AdminRoute><TemplatesPage /></AdminRoute>} />
 
           <Route path="*" element={<div className="min-h-screen bg-bg flex items-center justify-center"><p className="text-muted">Page not found</p></div>} />
         </Routes>
