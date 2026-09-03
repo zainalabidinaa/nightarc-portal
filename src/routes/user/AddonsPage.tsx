@@ -41,8 +41,15 @@ export default function AddonsPage() {
     async function load() {
       setLoading(true);
       let profileId = activeProfile!.id;
-      if (activeProfile!.uses_primary_addons) {
-        const { data } = await supabase.from('profiles').select('id').eq('role', 'admin').limit(1).single();
+      // uses_primary_addons defaults to true and is never cleared for admin
+      // profiles (install_curated_setup() returns early for role='admin'
+      // before it would flip the flag), so an admin must always see their
+      // own installed_addons — never redirect to "the" admin profile, which
+      // is ambiguous whenever an account has more than one admin-role
+      // profile (e.g. multiple household profiles under one account).
+      if (activeProfile!.role !== 'admin' && activeProfile!.uses_primary_addons) {
+        const { data } = await supabase
+          .from('profiles').select('id').eq('role', 'admin').order('created_at').limit(1).single();
         if (data) profileId = data.id;
       }
       const { data } = await supabase.from('installed_addons').select('*').eq('profile_id', profileId).order('sort_order');
