@@ -165,7 +165,7 @@ export default function InvitesPage() {
 
   return (
     <AppShell>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-text">Invite Codes</h1>
           <div className="flex items-center gap-2">
