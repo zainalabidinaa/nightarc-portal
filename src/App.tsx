@@ -15,6 +15,7 @@ import MyCollectionsPage from './routes/user/MyCollectionsPage';
 import BillingPage from './routes/user/BillingPage';
 import CatalogPage from './routes/admin/CatalogPage';
 import HomeLayoutPage from './routes/admin/HomeLayoutPage';
+import HomePresetsPage from './routes/admin/HomePresetsPage';
 import TemplatesPage from './routes/admin/TemplatesPage';
 import UsersPage from './routes/admin/UsersPage';
 import InvitesPage from './routes/admin/InvitesPage';
@@ -46,6 +47,7 @@ export default function App() {
 
           {/* Admin */}
           <Route path="/admin/home" element={<AdminRoute><HomeLayoutPage /></AdminRoute>} />
+          <Route path="/admin/home-presets" element={<AdminRoute><HomePresetsPage /></AdminRoute>} />
           <Route path="/admin/catalog" element={<AdminRoute><CatalogPage /></AdminRoute>} />
           <Route path="/admin/templates" element={<AdminRoute><TemplatesPage /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
