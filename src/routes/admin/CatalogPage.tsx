@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { AppShell } from '../../components/layout/AppShell';
 import { Button } from '../../components/ui/Button';
 import { FolderGrid } from '../../components/catalog/FolderGrid';
@@ -9,7 +10,7 @@ import { SourcesTable } from '../../components/catalog/SourcesTable';
 import { JsonImport } from '../../components/catalog/JsonImport';
 import { CollectionSettings } from '../../components/catalog/CollectionSettings';
 import { useAutoScrollOnDrag } from '../../hooks/useAutoScrollOnDrag';
-import type { Collection, Folder, FolderSource, FolderCatalog } from '../../types';
+import type { Collection, Folder, FolderSource, FolderCatalog, InstalledAddon } from '../../types';
 
 type Tab = 'folders' | 'artwork' | 'sources' | 'json' | 'collection';
 const TABS: { id: Tab; label: string }[] = [
@@ -22,6 +23,8 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function CatalogPage() {
   useAutoScrollOnDrag();
+  const { activeProfile } = useAuth();
+  const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   // Every folder across every collection, for the sidebar tree — separate
   // from `folders` below, which stays scoped to just the selected
@@ -51,6 +54,19 @@ export default function CatalogPage() {
 
     return () => { supabase.removeChannel(colSub); };
   }, []);
+
+  // The admin's own installed addons, so the Sources tab can browse/search
+  // any of them (not just the hardcoded AIOMetadata manifest) and correctly
+  // attribute a catalog source to the addon it actually came from — without
+  // this, every source shows "Unknown addon" regardless of how it was added.
+  useEffect(() => {
+    if (!activeProfile) { setInstalledAddons([]); return; }
+    supabase.from('installed_addons').select('*').eq('profile_id', activeProfile.id).order('sort_order')
+      .then(({ data, error }) => {
+        if (error) { console.error('installed_addons error:', error); return; }
+        setInstalledAddons((data ?? []) as InstalledAddon[]);
+      });
+  }, [activeProfile]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -618,6 +634,7 @@ export default function CatalogPage() {
                   onDeleteSource={deleteSource}
                   onAddCatalog={addCatalog}
                   onDeleteCatalog={deleteCatalog}
+                  addons={installedAddons}
                 />
               ) : (
                 <div className="py-16 text-center text-sm text-muted">Pick a folder from the Folders tab to edit its sources.</div>
