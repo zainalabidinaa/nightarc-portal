@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FolderCatalog, InstalledAddon } from '../../types';
-import { useAddonManifest, AIO_MANIFEST_URL } from '../../hooks/useAddonManifest';
-import { useCatalogPreview } from '../../hooks/useCatalogPreview';
+import { useAddonManifest, useAllAddonManifests, AIO_MANIFEST_URL } from '../../hooks/useAddonManifest';
+import { useCatalogPreview, useCatalogHealth } from '../../hooks/useCatalogPreview';
 import { Button } from '../ui/Button';
 
 interface Props {
@@ -14,17 +14,53 @@ interface Props {
   addons?: InstalledAddon[];
 }
 
+// Fallback when an addon has no `addon_name` set — the hostname alone reads
+// far better than the raw manifest URL, which for a signed/token-scoped
+// manifest can run to hundreds of characters (a JWT in the path).
+function shortenAddonUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
 export function CatalogSourceEditor({ catalogs, onAdd, onDelete, addons }: Props) {
   const [selectedAddonId, setSelectedAddonId] = useState<string>(addons?.[0]?.id ?? '');
   const activeAddon = addons?.find((a) => a.id === selectedAddonId) ?? null;
   const manifestUrl = addons ? (activeAddon?.addon_url ?? '') : AIO_MANIFEST_URL;
   const { manifest, loading, error, hasUpdate, refresh, catalogById } = useAddonManifest(manifestUrl);
+  // Every existing row's own addon (not just whichever one is selected in the
+  // picker above) — lets each row show its real catalog name/staleness.
+  const { catalogFor: catalogForRow } = useAllAddonManifests(addons);
 
   const [search, setSearch] = useState('');
   const [selectedCatalogId, setSelectedCatalogId] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('');
   const [adding, setAdding] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+
+  // Manual entry, for catalog ids the manifest doesn't (and can't) list —
+  // e.g. `tmdb.upcoming`, served by Moonlit itself rather than the addon.
+  // Without this there was no way to attach one short of a direct DB insert.
+  const [customMode, setCustomMode] = useState(false);
+  const [customCatalogId, setCustomCatalogId] = useState('');
+  const [customType, setCustomType] = useState('series');
+  const [customGenre, setCustomGenre] = useState('');
+  const [addingCustom, setAddingCustom] = useState(false);
+
+  async function handleAddCustom() {
+    const id = customCatalogId.trim();
+    if (!id) return;
+    setAddingCustom(true);
+    await onAdd(id, customType, customGenre.trim() || null, activeAddon?.id ?? null);
+    setCustomCatalogId('');
+    setCustomGenre('');
+    setCustomMode(false);
+    setShowPicker(false);
+    setAddingCustom(false);
+  }
 
   const selectedCatalog = manifest?.catalogs.find((c) => c.id === selectedCatalogId) ?? null;
 
@@ -83,20 +119,28 @@ export function CatalogSourceEditor({ catalogs, onAdd, onDelete, addons }: Props
       {catalogs.length > 0 && (
         <div className="mb-4 grid gap-2">
           {catalogs.map((c) => {
-            const meta = catalogById(c.catalog_id);
             const sourceAddon = addons?.find((a) => a.id === c.addon_id) ?? null;
-            // Only meaningful once the manifest for THIS row's addon is the one
-            // loaded; otherwise we can't tell "removed" from "not checked".
-            const checkable = !loading && !error && manifest !== null
-              && (!addons || sourceAddon?.id === activeAddon?.id);
+            // Prefer this row's own addon manifest (works regardless of what's
+            // selected in the picker); fall back to the single active/AIO
+            // manifest for legacy rows with no addon_id recorded.
+            const ownMeta = catalogForRow(c.addon_id, c.catalog_id);
+            const meta = c.addon_id ? ownMeta : catalogById(c.catalog_id);
+            const checkable = c.addon_id
+              ? true
+              : !loading && !error && manifest !== null && (!addons || !sourceAddon);
             return (
               <SourceRow
                 key={c.id}
                 catalog={c}
                 displayName={meta?.name ?? c.catalog_id}
-                addonName={sourceAddon?.addon_name ?? sourceAddon?.addon_url ?? null}
+                addonName={sourceAddon?.addon_name ?? shortenAddonUrl(sourceAddon?.addon_url) ?? null}
                 addonUrl={sourceAddon?.addon_url ?? (addons ? null : AIO_MANIFEST_URL)}
                 isStale={checkable ? meta === null : null}
+                // `genre === 'None'` is Moonlit's "no genre selected" sentinel
+                // (see the genre <select>'s "None" option above) — a required
+                // genre with that value is exactly the `trakt.anticipated.shows`
+                // situation: the addon silently drops nearly everything.
+                genreRequiredButUnset={!!meta?.genreRequired && (!c.genre || c.genre === 'None')}
                 onDelete={onDelete}
               />
             );
@@ -115,8 +159,68 @@ export function CatalogSourceEditor({ catalogs, onAdd, onDelete, addons }: Props
         </button>
       ) : (
         <div className="rounded-2xl border border-accent/20 bg-surface-2 p-4">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-muted">Select catalog</p>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted">
+              {customMode ? 'Custom catalog id' : 'Select catalog'}
+            </p>
+            <button
+              onClick={() => setCustomMode((v) => !v)}
+              className="font-mono text-[10px] text-faint hover:text-accent transition-colors"
+            >
+              {customMode ? '← back to search' : "can't find it? add by id"}
+            </button>
+          </div>
 
+          {customMode ? (
+            <div>
+              <p className="mb-3 text-xs text-muted">
+                For a catalog id the manifest doesn't list — e.g. a Moonlit-served synthetic
+                source like <code className="text-accent">tmdb.upcoming</code>, not an
+                AIOMetadata catalog.
+              </p>
+              <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+                Catalog id
+              </label>
+              <input
+                type="text"
+                placeholder="tmdb.upcoming"
+                value={customCatalogId}
+                onChange={(e) => setCustomCatalogId(e.target.value)}
+                className="mb-3 w-full rounded-xl border border-border bg-bg px-3 py-2 font-mono text-[12px] text-text outline-none focus:border-accent placeholder:text-faint"
+              />
+              <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+                Type
+              </label>
+              <select
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value)}
+                className="mb-3 w-full rounded-xl border border-border bg-bg px-3 py-2 font-mono text-[12px] text-text outline-none focus:border-accent"
+              >
+                <option value="movie">movie</option>
+                <option value="series">series</option>
+                <option value="all">all</option>
+              </select>
+              <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+                Genre (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="None"
+                value={customGenre}
+                onChange={(e) => setCustomGenre(e.target.value)}
+                className="mb-3 w-full rounded-xl border border-border bg-bg px-3 py-2 font-mono text-[12px] text-text outline-none focus:border-accent placeholder:text-faint"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" loading={addingCustom} disabled={!customCatalogId.trim()} onClick={handleAddCustom}>
+                  Add source
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setShowPicker(false); setCustomMode(false); }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+          <>
           {addons && (
             <div className="mb-3">
               <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -204,6 +308,8 @@ export function CatalogSourceEditor({ catalogs, onAdd, onDelete, addons }: Props
               Cancel
             </Button>
           </div>
+          </>
+          )}
         </div>
       )}
     </div>
@@ -217,14 +323,22 @@ interface SourceRowProps {
   addonUrl: string | null;
   /** null = the check could not run (manifest still loading or unreachable). */
   isStale: boolean | null;
+  /** True when the addon marks this catalog's genre filter required and the
+   *  folder source has none set — the addon then silently returns almost
+   *  nothing rather than erroring, so this can't be seen from the item count
+   *  alone once it's already low. */
+  genreRequiredButUnset: boolean;
   onDelete: (id: string) => Promise<void>;
 }
 
-export function SourceRow({ catalog, displayName, addonName, addonUrl, isStale, onDelete }: SourceRowProps) {
+export function SourceRow({ catalog, displayName, addonName, addonUrl, isStale, genreRequiredButUnset, onDelete }: SourceRowProps) {
   const [expanded, setExpanded] = useState(false);
   const { items, loading, error } = useCatalogPreview(
     addonUrl, catalog.media_type, catalog.catalog_id, expanded,
   );
+  // Probed once on mount, independent of `expanded` — the whole point is
+  // making a dead catalog visible without the admin needing to dig for it.
+  const health = useCatalogHealth(addonUrl, catalog.media_type, catalog.catalog_id);
 
   return (
     <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
@@ -247,6 +361,26 @@ export function SourceRow({ catalog, displayName, addonName, addonUrl, isStale, 
           {isStale === true && (
             <span className="rounded px-1.5 py-0.5 font-mono text-[9px] bg-red-400/10 text-red-400">
               stale
+            </span>
+          )}
+          {health.status === 'ok' && (
+            <span
+              title={`Addon returned ${health.count} item${health.count === 1 ? '' : 's'} for this catalog`}
+              className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${
+                health.count === 0 ? 'bg-red-400/10 text-red-400' :
+                health.count < 10 ? 'bg-amber-400/10 text-amber-400' :
+                'bg-green-400/10 text-green-400'
+              }`}
+            >
+              {health.count} items
+            </span>
+          )}
+          {genreRequiredButUnset && (
+            <span
+              title="This catalog requires a genre filter and the source has none set — the addon returns almost nothing without one"
+              className="rounded px-1.5 py-0.5 font-mono text-[9px] bg-amber-400/10 text-amber-400"
+            >
+              genre required
             </span>
           )}
           <span className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
