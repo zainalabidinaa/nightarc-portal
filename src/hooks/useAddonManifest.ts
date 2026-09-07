@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { InstalledAddon } from '../types';
 
 export const AIO_MANIFEST_URL =
   'https://aiometadata.fortheweak.cloud/stremio/1bf2cd94-2057-4992-9ed7-a8464f12e4a4/manifest.json';
@@ -81,4 +82,56 @@ export function useAddonManifest(url = AIO_MANIFEST_URL) {
   );
 
   return { manifest: state, loading, error, hasUpdate, refresh, catalogById };
+}
+
+/**
+ * Fetches every distinct addon a folder's catalogs actually reference, so
+ * each row can show its own real catalog name and staleness — instead of
+ * `useAddonManifest`'s single active manifest, which only matches whichever
+ * addon happens to be selected in the picker and leaves every other row's
+ * catalog id shown raw (e.g. "streaming_netflix_originals_series" instead of
+ * "Netflix Originals").
+ */
+export function useAllAddonManifests(addons: InstalledAddon[] | undefined) {
+  const [byAddonId, setByAddonId] = useState<Record<string, ManifestCatalog[]>>({});
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const urlsKey = (addons ?? []).map((a) => `${a.id}:${a.addon_url}`).join(',');
+
+  useEffect(() => {
+    if (!addons || addons.length === 0) { setByAddonId({}); return; }
+    let cancelled = false;
+    setLoadingIds(new Set(addons.map((a) => a.id)));
+
+    Promise.all(addons.map(async (a) => {
+      try {
+        const res = await fetch(a.addon_url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        return [a.id, parseCatalogs(json.catalogs ?? [])] as const;
+      } catch {
+        return [a.id, null] as const;
+      }
+    })).then((results) => {
+      if (cancelled) return;
+      const next: Record<string, ManifestCatalog[]> = {};
+      for (const [id, catalogs] of results) {
+        if (catalogs) next[id] = catalogs;
+      }
+      setByAddonId(next);
+      setLoadingIds(new Set());
+    });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlsKey]);
+
+  const catalogFor = useCallback(
+    (addonId: string | null | undefined, catalogId: string): ManifestCatalog | null => {
+      if (!addonId) return null;
+      return byAddonId[addonId]?.find((c) => c.id === catalogId) ?? null;
+    },
+    [byAddonId],
+  );
+
+  return { catalogFor, loadingIds };
 }
